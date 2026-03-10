@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/ssinistro242-byte/gumballbot#readme",
   "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc.9"
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "qrcode-terminal": "^0.12.0"
   }
 }
