@@ -1,7 +1,7 @@
 {
   "name": "gumballbot",
   "version": "1.0.0",
-  "description": "GumballBot - WhatsApp bot",
+  "description": "GumballBot WhatsApp",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
