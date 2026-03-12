@@ -37,15 +37,14 @@ sock.ev.on("connection.update", async (update)=>{
 
 const { connection, qr, lastDisconnect } = update
 
-if(qr){
+if (qr) {
 
-console.log("\n📱 ESCANEIE O QR CODE:\n")
+console.log("📱 ESCANEIE O QR:")
+console.log("QR CODE:", qr)
 
-qrcode.generate(qr,{small:true})
+console.log("⏳ Você tem 1 minuto para escanear...")
 
-console.log("\n⏳ Você tem 1 minuto para escanear...\n")
-
-await new Promise(r=>setTimeout(r,60000))
+await new Promise(resolve => setTimeout(resolve, 60000))
 
 }
 
