@@ -1,20 +1,18 @@
 {
   "name": "gumballbot",
-  "version": "2.0.0",
-  "description": "GumballBot - WhatsApp automation bot",
+  "version": "1.0.0",
+  "description": "GumballBot - WhatsApp bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
   "author": "_pauloofc",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "@hapi/boom": "^10.0.1",
     "node-fetch": "^2.6.7",
     "pino": "^8.17.0",
-    "qrcode-terminal": "^0.12.0",
     "ws": "^8.14.2"
   }
 }
