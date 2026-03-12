@@ -88,7 +88,7 @@ reconnectDelay=Math.min(reconnectDelay*2,30000)
 
 })
 
-sock.ev.on("messages.upsert",async({messages})=>{
+if(msg.key.fromMe) return sock.ev.on("messages.upsert",async({messages})=>{
 
 const msg=messages?.[0]
 if(!msg) return
@@ -107,18 +107,19 @@ const command=text.split(" ")[0]
 
 console.log("📩",text)
 
-if(text==="oi"||text==="ola"){
+// mensagem de boas vindas na primeira mensagem
+if(!text.startsWith("!")){
+
 await sock.sendMessage(from,{
-text:`😺 Olá!
+text:`😺 Olá! Eu sou o *GumballBot*
 
-Eu sou o *GumballBot*
+"A vida pode ser estranha… mas sempre pode ficar divertida." — Gumball
 
-"A vida pode ser estranha… mas sempre pode ficar divertida."
-
-Digite *!menu*
+📜 Digite *!menu* para ver todos comandos
 
 🤖 Bot criado por _pauloofc`
 })
+
 }
 
 if(command==="!menu"){
@@ -320,60 +321,66 @@ if(command==="!yt"){
 
 let url=text.split(" ")[1]
 
+if(!url) return sock.sendMessage(from,{text:"envie um link do youtube"})
+
 try{
 
-let res=await fetch(`https://api.tiklydown.eu.org/api/download/youtube?url=${url}`)
-let data=await res.json()
+let api=`https://api.douxx.tech/api/youtube/video?url=${url}`
 
 await sock.sendMessage(from,{
-video:{url:data.video},
-caption:"📥 youtube download"
+video:{url:api},
+caption:"📥 download youtube"
 })
 
 }catch{
-sock.sendMessage(from,{text:"erro download"})
-}
 
+sock.sendMessage(from,{text:"erro ao baixar video"})
+
+}
 }
 
 if(command==="!ytmp3"){
 
 let url=text.split(" ")[1]
 
+if(!url) return sock.sendMessage(from,{text:"envie link youtube"})
+
 try{
 
-let res=await fetch(`https://api.tiklydown.eu.org/api/download/youtube?url=${url}`)
-let data=await res.json()
+let api=`https://api.douxx.tech/api/youtube/mp3?url=${url}`
 
 await sock.sendMessage(from,{
-audio:{url:data.audio},
+audio:{url:api},
 mimetype:"audio/mp4"
 })
 
 }catch{
-sock.sendMessage(from,{text:"erro mp3"})
-}
 
+sock.sendMessage(from,{text:"erro mp3"})
+
+}
 }
 
 if(command==="!tiktok"){
 
 let url=text.split(" ")[1]
 
+if(!url) return sock.sendMessage(from,{text:"envie link tiktok"})
+
 try{
 
-let res=await fetch(`https://api.tiklydown.eu.org/api/download/tiktok?url=${url}`)
-let data=await res.json()
+let api=`https://api.douxx.tech/api/tiktok/video?url=${url}`
 
 await sock.sendMessage(from,{
-video:{url:data.video},
-caption:"📥 tiktok download"
+video:{url:api},
+caption:"📥 download tiktok"
 })
 
 }catch{
-sock.sendMessage(from,{text:"erro tiktok"})
-}
 
+sock.sendMessage(from,{text:"erro tiktok"})
+
+}
 }
 
 })
