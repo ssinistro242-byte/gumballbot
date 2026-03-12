@@ -1,4 +1,4 @@
-console.log("🚀 GumballBot iniciando...")
+console.log("🚀 Iniciando GumballBot...")
 
 const {
 default: makeWASocket,
@@ -7,16 +7,17 @@ DisconnectReason,
 fetchLatestBaileysVersion
 } = require("@whiskeysockets/baileys")
 
-const { Boom } = require("@hapi/boom")
 const P = require("pino")
 const axios = require("axios")
-const ytdl = require("ytdl-core")
+const yts = require("yt-search")
+const qrcode = require("qrcode-terminal")
+const { Boom } = require("@hapi/boom")
 
 // proteção contra crash
 process.on("uncaughtException", console.error)
 process.on("unhandledRejection", console.error)
 
-const usuariosIniciados = new Set()
+const usuarios = new Set()
 
 async function startBot(){
 
@@ -32,15 +33,24 @@ printQRInTerminal:false
 
 sock.ev.on("creds.update", saveCreds)
 
-sock.ev.on("connection.update", ({connection,lastDisconnect,qr})=>{
+sock.ev.on("connection.update", async (update)=>{
+
+const { connection, qr, lastDisconnect } = update
 
 if(qr){
-console.log("📱 ESCANEIE O QR:")
-console.log("QR CODE:", qr)
+
+console.log("\n📱 ESCANEIE O QR CODE:\n")
+
+qrcode.generate(qr,{small:true})
+
+console.log("\n⏳ Você tem 1 minuto para escanear...\n")
+
+await new Promise(r=>setTimeout(r,60000))
+
 }
 
 if(connection==="open"){
-console.log("✅ BOT CONECTADO")
+console.log("✅ GumballBot conectado!")
 }
 
 if(connection==="close"){
@@ -62,7 +72,6 @@ startBot()
 sock.ev.on("messages.upsert", async ({messages})=>{
 
 const msg = messages[0]
-if(!msg) return
 if(!msg.message) return
 if(msg.key.fromMe) return
 
@@ -73,23 +82,26 @@ msg.message.conversation ||
 msg.message.extendedTextMessage?.text ||
 ""
 
-const args = text.trim().split(/ +/)
-const command = args[0]?.toLowerCase()
+const args = text.split(" ")
+const command = args[0].toLowerCase()
 
-console.log("📩", text)
+console.log("📩",text)
 
 
-// mensagem inicial 1 vez
-if(!usuariosIniciados.has(from)){
+// mensagem inicial
+if(!usuarios.has(from)){
 
-usuariosIniciados.add(from)
+usuarios.add(from)
 
 await sock.sendMessage(from,{
-text:`😺 Olá! Eu sou o *GumballBot*
+text:`╔══════════════╗
+  𝙂𝙐𝙈𝘽𝘼𝙇𝙇 𝘽𝙊𝙏 😺
+╚══════════════╝
 
-"A vida é meio maluca… mas sempre dá pra rir!"
+"Às vezes a vida é maluca… mas sempre dá pra rir!"
 
-Digite *!menu* para ver os comandos.
+Digite:
+➜ !menu
 
 🤖 criado por _pauloofc`
 })
@@ -101,9 +113,12 @@ Digite *!menu* para ver os comandos.
 if(command==="!menu"){
 
 await sock.sendMessage(from,{
-text:`🤖 *GUMBALL BOT*
+text:`╔══════════════╗
+     𝙈𝙀𝙉𝙐
+╚══════════════╝
 
-📥 DOWNLOAD
+🎵 DOWNLOAD
+!play musica
 !ytmp3 link
 !ytmp4 link
 
@@ -118,13 +133,13 @@ text:`🤖 *GUMBALL BOT*
 !data
 !piada
 
-⚙️ BOT
+⚙ BOT
 !menu
 !voltar
 !criador
 
 ━━━━━━━━━━━━━━
-🤖 criado por _pauloofc`
+🤖 _pauloofc`
 })
 
 }
@@ -133,8 +148,8 @@ text:`🤖 *GUMBALL BOT*
 // VOLTAR
 if(command==="!voltar"){
 
-await sock.sendMessage(from,{
-text:"🔙 Voltando ao menu\nDigite *!menu*"
+sock.sendMessage(from,{
+text:"🔙 Voltando ao menu\nDigite !menu"
 })
 
 }
@@ -143,7 +158,7 @@ text:"🔙 Voltando ao menu\nDigite *!menu*"
 // CRIADOR
 if(command==="!criador"){
 
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 text:"👑 Bot criado por _pauloofc"
 })
 
@@ -153,7 +168,7 @@ text:"👑 Bot criado por _pauloofc"
 // HORA
 if(command==="!hora"){
 
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 text:`🕒 ${new Date().toLocaleTimeString()}`
 })
 
@@ -163,7 +178,7 @@ text:`🕒 ${new Date().toLocaleTimeString()}`
 // DATA
 if(command==="!data"){
 
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 text:`📅 ${new Date().toLocaleDateString()}`
 })
 
@@ -177,13 +192,13 @@ try{
 
 const r = await axios.get("https://official-joke-api.appspot.com/random_joke")
 
-await sock.sendMessage(from,{
-text:`😂 ${r.data.setup}\n\n${r.data.punchline}`
+sock.sendMessage(from,{
+text:`😂 ${r.data.setup}\n${r.data.punchline}`
 })
 
 }catch{
 
-sock.sendMessage(from,{text:"❌ erro pegar piada"})
+sock.sendMessage(from,{text:"erro pegar piada"})
 
 }
 
@@ -194,20 +209,21 @@ sock.sendMessage(from,{text:"❌ erro pegar piada"})
 if(command==="!cep"){
 
 const cep = args[1]
+
 if(!cep) return
 
 try{
 
 const r = await axios.get(`https://viacep.com.br/ws/${cep}/json/`)
 
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 text:`📍 ${r.data.logradouro}
 ${r.data.localidade} - ${r.data.uf}`
 })
 
 }catch{
 
-sock.sendMessage(from,{text:"❌ erro buscar CEP"})
+sock.sendMessage(from,{text:"erro buscar cep"})
 
 }
 
@@ -218,19 +234,52 @@ sock.sendMessage(from,{text:"❌ erro buscar CEP"})
 if(command==="!clima"){
 
 const cidade = args.slice(1).join(" ")
+
 if(!cidade) return
 
 try{
 
 const r = await axios.get(`https://wttr.in/${cidade}?format=3`)
 
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 text:`🌤 ${r.data}`
 })
 
 }catch{
 
-sock.sendMessage(from,{text:"❌ erro pegar clima"})
+sock.sendMessage(from,{text:"erro clima"})
+
+}
+
+}
+
+
+// PLAY MUSICA
+if(command==="!play"){
+
+const nome = args.slice(1).join(" ")
+
+if(!nome) return
+
+try{
+
+sock.sendMessage(from,{text:"🔎 Procurando música..."})
+
+const r = await yts(nome)
+
+const video = r.videos[0]
+
+sock.sendMessage(from,{
+text:`🎵 ${video.title}
+${video.url}
+
+Use:
+!ytmp3 ${video.url}`
+})
+
+}catch{
+
+sock.sendMessage(from,{text:"erro buscar musica"})
 
 }
 
@@ -242,28 +291,13 @@ if(command==="!ytmp3"){
 
 const url = args[1]
 
-if(!url || !ytdl.validateURL(url)){
-return sock.sendMessage(from,{text:"❌ envie link válido do YouTube"})
-}
+if(!url) return
 
-try{
+sock.sendMessage(from,{
+text:`🎧 Baixe aqui:
 
-await sock.sendMessage(from,{text:"🎵 Baixando música..."})
-
-const stream = ytdl(url,{filter:"audioonly"})
-
-await sock.sendMessage(from,{
-audio: stream,
-mimetype:"audio/mpeg"
+https://api.vevioz.com/api/button/mp3/${url}`
 })
-
-}catch(e){
-
-console.log(e)
-
-sock.sendMessage(from,{text:"❌ erro baixar música"})
-
-}
 
 }
 
@@ -273,27 +307,13 @@ if(command==="!ytmp4"){
 
 const url = args[1]
 
-if(!url || !ytdl.validateURL(url)){
-return sock.sendMessage(from,{text:"❌ envie link válido do YouTube"})
-}
+if(!url) return
 
-try{
+sock.sendMessage(from,{
+text:`🎬 Baixe aqui:
 
-await sock.sendMessage(from,{text:"🎬 Baixando vídeo..."})
-
-const stream = ytdl(url,{quality:"18"})
-
-await sock.sendMessage(from,{
-video: stream
+https://api.vevioz.com/api/button/videos/${url}`
 })
-
-}catch(e){
-
-console.log(e)
-
-sock.sendMessage(from,{text:"❌ erro baixar vídeo"})
-
-}
 
 }
 
@@ -301,31 +321,9 @@ sock.sendMessage(from,{text:"❌ erro baixar vídeo"})
 // STICKER
 if(command==="!sticker"){
 
-const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage
-
-if(!quoted?.imageMessage){
-
-return sock.sendMessage(from,{
-text:"📸 responda uma imagem com !sticker"
+sock.sendMessage(from,{
+text:"📸 Envie uma imagem com legenda !sticker (feature simples)"
 })
-
-}
-
-try{
-
-const buffer = await sock.downloadMediaMessage(msg)
-
-await sock.sendMessage(from,{
-sticker: buffer
-})
-
-}catch(e){
-
-console.log(e)
-
-sock.sendMessage(from,{text:"❌ erro criar figurinha"})
-
-}
 
 }
 
