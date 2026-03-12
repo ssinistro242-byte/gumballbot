@@ -1,4 +1,4 @@
-console.log("🚀 GUMBALL BOT INICIANDO...")
+console.log("🚀 GumballBot iniciando")
 
 const {
 default: makeWASocket,
@@ -9,389 +9,311 @@ fetchLatestBaileysVersion
 
 const { Boom } = require("@hapi/boom")
 const P = require("pino")
-const fetch = require("node-fetch")
-const https = require("https")
-const WebSocket = require("ws")
+const qrcode = require("qrcode-terminal")
+const axios = require("axios")
 
-process.on("uncaughtException",err=>console.log(err))
-process.on("unhandledRejection",err=>console.log(err))
-
-let reconnectDelay = 2000
+process.on("uncaughtException", console.error)
+process.on("unhandledRejection", console.error)
 
 async function startBot(){
 
-try{
+const { state, saveCreds } = await useMultiFileAuthState("auth")
 
-const {state,saveCreds} = await useMultiFileAuthState("auth")
-
-const {version} = await fetchLatestBaileysVersion()
+const { version } = await fetchLatestBaileysVersion()
 
 const sock = makeWASocket({
-
-auth: state,
 version,
-
-logger: P({level:"silent"}),
-
-browser:["Ubuntu","Chrome","120.0.0"],
-
-connectTimeoutMs:60000,
-
-keepAliveIntervalMs:20000,
-
-markOnlineOnConnect:true,
-
-syncFullHistory:false,
-
-printQRInTerminal:false,
-
-agent:new https.Agent({
-keepAlive:true,
-maxSockets:1
-}),
-
-ws:WebSocket
-
+logger:P({level:"silent"}),
+auth:state
 })
 
-sock.ev.on("creds.update",saveCreds)
+sock.ev.on("creds.update", saveCreds)
 
-sock.ev.on("connection.update",({connection,lastDisconnect,qr})=>{
+sock.ev.on("connection.update", ({connection,lastDisconnect,qr})=>{
 
 if(qr){
-console.log("📱 ESCANEIE O QR:")
-console.log("QR CODE:",qr)
+console.log("📱 ESCANEIE O QR")
+qrcode.generate(qr,{small:true})
 }
 
 if(connection==="open"){
 console.log("✅ BOT CONECTADO")
-reconnectDelay=2000
 }
 
 if(connection==="close"){
 
-const error=lastDisconnect?.error
-const code=error?new Boom(error).output.statusCode:0
+const shouldReconnect =
+(lastDisconnect.error = new Boom(lastDisconnect?.error))?.output?.statusCode !== DisconnectReason.loggedOut
 
-if(code===DisconnectReason.loggedOut){
-console.log("❌ sessão encerrada apague pasta auth")
-return
+if(shouldReconnect){
+console.log("🔄 reconectando")
+startBot()
 }
-
-console.log("🔄 reconectando...")
-
-setTimeout(startBot,reconnectDelay)
-
-reconnectDelay=Math.min(reconnectDelay*2,30000)
 
 }
 
 })
 
-if(msg.key.fromMe) return sock.ev.on("messages.upsert",async({messages})=>{
+sock.ev.on("messages.upsert", async ({messages})=>{
 
-const msg=messages?.[0]
+const msg = messages[0]
+
 if(!msg) return
 if(!msg.message) return
+if(msg.key.fromMe) return
 
-const from=msg.key.remoteJid
+const from = msg.key.remoteJid
 
-const text=
-msg.message.conversation||
-msg.message.extendedTextMessage?.text||
+const text =
+msg.message.conversation ||
+msg.message.extendedTextMessage?.text ||
 ""
 
-if(!text) return
-
-const command=text.split(" ")[0]
+const args = text.split(" ")
+const command = args[0].toLowerCase()
 
 console.log("📩",text)
 
-// mensagem de boas vindas na primeira mensagem
 if(!text.startsWith("!")){
 
 await sock.sendMessage(from,{
 text:`😺 Olá! Eu sou o *GumballBot*
 
-"A vida pode ser estranha… mas sempre pode ficar divertida." — Gumball
+"Às vezes a vida é maluca… mas sempre dá pra rir!"
 
-📜 Digite *!menu* para ver todos comandos
+Digite *!menu*
 
-🤖 Bot criado por _pauloofc`
+🤖 bot criado por _pauloofc`
 })
+
+return
 
 }
 
 if(command==="!menu"){
-await sock.sendMessage(from,{
-text:`😺 *GUMBALL BOT*
 
-⚙️ Sistema
-!ping
+await sock.sendMessage(from,{
+text:`🤖 *GUMBALL BOT*
+
+🎵 DOWNLOAD
+!play nome
+!ytmp3 link
+!ytmp4 link
+!tiktok link
+!instagram link
+
+🖼 FIGURINHA
+(responda imagem)
+!sticker
+
+🌎 UTILIDADES
 !hora
 !data
-!criador
-!id
-
-🌎 Utilidades
 !clima cidade
 !cep numero
-!dolar
-!traduz texto
-
-🎲 Diversão
-!dado
-!moeda
-!chance
-!numero
+!ip
 !piada
-!fato
-!conselho
 
-🎮 Jogos
-!math
-!quiz
-!adivinhar
-
-📥 Downloads
-!yt link
-!ytmp3 link
-!tiktok link
-
-🤖 Criado por _pauloofc`
+👑 BOT
+!criador`
 })
-}
 
-if(command==="!ping"){
-await sock.sendMessage(from,{text:"🏓 pong"})
-}
-
-if(command==="!hora"){
-await sock.sendMessage(from,{text:`⏰ ${new Date().toLocaleTimeString()}`})
-}
-
-if(command==="!data"){
-await sock.sendMessage(from,{text:`📅 ${new Date().toLocaleDateString()}`})
 }
 
 if(command==="!criador"){
-await sock.sendMessage(from,{text:"🤖 bot criado por _pauloofc"})
+
+await sock.sendMessage(from,{
+text:"👑 Bot criado por _pauloofc"
+})
+
 }
 
-if(command==="!id"){
-await sock.sendMessage(from,{text:`🆔 ${from}`})
+if(command==="!hora"){
+
+await sock.sendMessage(from,{
+text:`🕒 ${new Date().toLocaleTimeString()}`
+})
+
 }
 
-if(command==="!dado"){
-let n=Math.floor(Math.random()*6)+1
-await sock.sendMessage(from,{text:`🎲 ${n}`})
+if(command==="!data"){
+
+await sock.sendMessage(from,{
+text:`📅 ${new Date().toLocaleDateString()}`
+})
+
 }
 
-if(command==="!moeda"){
-let r=Math.random()<0.5?"cara":"coroa"
-await sock.sendMessage(from,{text:`🪙 ${r}`})
-}
+if(command==="!ip"){
 
-if(command==="!chance"){
-let n=Math.floor(Math.random()*100)
-await sock.sendMessage(from,{text:`🎯 ${n}%`})
-}
+const r = await axios.get("https://api64.ipify.org?format=json")
 
-if(command==="!numero"){
-let n=Math.floor(Math.random()*100)
-await sock.sendMessage(from,{text:`🔢 ${n}`})
+await sock.sendMessage(from,{
+text:`🌐 IP: ${r.data.ip}`
+})
+
 }
 
 if(command==="!piada"){
-try{
-let res=await fetch("https://official-joke-api.appspot.com/random_joke")
-let data=await res.json()
-await sock.sendMessage(from,{text:`😂 ${data.setup}\n\n${data.punchline}`})
-}catch{
-sock.sendMessage(from,{text:"erro piada"})
-}
-}
 
-if(command==="!conselho"){
-try{
-let res=await fetch("https://api.adviceslip.com/advice")
-let data=await res.json()
-await sock.sendMessage(from,{text:`💡 ${data.slip.advice}`})
-}catch{
-sock.sendMessage(from,{text:"erro conselho"})
-}
-}
-
-if(command==="!fato"){
-try{
-let res=await fetch("https://uselessfacts.jsph.pl/random.json?language=en")
-let data=await res.json()
-await sock.sendMessage(from,{text:`📚 ${data.text}`})
-}catch{
-sock.sendMessage(from,{text:"erro fato"})
-}
-}
-
-if(command==="!clima"){
-
-let cidade=text.split(" ").slice(1).join(" ")
-
-if(!cidade){
-return sock.sendMessage(from,{text:"use !clima cidade"})
-}
-
-try{
-
-let res=await fetch(`https://wttr.in/${cidade}?format=j1`)
-let data=await res.json()
-
-let temp=data.current_condition[0].temp_C
-let desc=data.current_condition[0].weatherDesc[0].value
-let hum=data.current_condition[0].humidity
+const r = await axios.get("https://official-joke-api.appspot.com/random_joke")
 
 await sock.sendMessage(from,{
-text:`🌤️ Clima em ${cidade}
-
-🌡️ Temperatura: ${temp}°C
-☁️ Condição: ${desc}
-💧 Umidade: ${hum}%`
+text:`😂 ${r.data.setup}\n\n${r.data.punchline}`
 })
 
-}catch{
-
-sock.sendMessage(from,{text:"erro clima"})
-
-}
 }
 
 if(command==="!cep"){
 
-let cep=text.split(" ")[1]
+const cep = args[1]
+
+if(!cep) return
+
+const r = await axios.get(`https://viacep.com.br/ws/${cep}/json/`)
+
+await sock.sendMessage(from,{
+text:`📍 ${r.data.logradouro}
+${r.data.localidade} - ${r.data.uf}`
+})
+
+}
+
+if(command==="!clima"){
+
+const cidade = args.slice(1).join(" ")
+
+if(!cidade) return
+
+const r = await axios.get(`https://wttr.in/${cidade}?format=3`)
+
+await sock.sendMessage(from,{
+text:`🌤 ${r.data}`
+})
+
+}
+
+if(command==="!play"){
+
+const nome = args.slice(1).join(" ")
+
+if(!nome) return
 
 try{
 
-let res=await fetch(`https://viacep.com.br/ws/${cep}/json/`)
-let data=await res.json()
+const r = await axios.get(`https://api.popcat.xyz/yt?q=${nome}`)
 
 await sock.sendMessage(from,{
-text:`📍 CEP ${cep}
-
-Rua: ${data.logradouro}
-Bairro: ${data.bairro}
-Cidade: ${data.localidade}
-Estado: ${data.uf}`
+audio:{url:r.data.url},
+mimetype:"audio/mpeg"
 })
 
 }catch{
 
-sock.sendMessage(from,{text:"erro cep"})
-
-}
-}
-
-if(command==="!dolar"){
-try{
-let res=await fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL")
-let data=await res.json()
-await sock.sendMessage(from,{text:`💰 dólar: R$ ${data.USDBRL.bid}`})
-}catch{
-sock.sendMessage(from,{text:"erro dolar"})
-}
-}
-
-if(command==="!traduz"){
-
-let texto=text.split(" ").slice(1).join(" ")
-
-try{
-
-let res=await fetch(`https://api.mymemory.translated.net/get?q=${texto}&langpair=en|pt`)
-let data=await res.json()
-
-await sock.sendMessage(from,{text:`🌎 ${data.responseData.translatedText}`})
-
-}catch{
-
-sock.sendMessage(from,{text:"erro tradução"})
-
-}
-}
-
-if(command==="!yt"){
-
-let url=text.split(" ")[1]
-
-if(!url) return sock.sendMessage(from,{text:"envie um link do youtube"})
-
-try{
-
-let api=`https://api.douxx.tech/api/youtube/video?url=${url}`
-
 await sock.sendMessage(from,{
-video:{url:api},
-caption:"📥 download youtube"
+text:"❌ erro baixar música"
 })
 
-}catch{
-
-sock.sendMessage(from,{text:"erro ao baixar video"})
-
 }
+
 }
 
 if(command==="!ytmp3"){
 
-let url=text.split(" ")[1]
+const url = args[1]
 
-if(!url) return sock.sendMessage(from,{text:"envie link youtube"})
+if(!url) return
 
 try{
 
-let api=`https://api.douxx.tech/api/youtube/mp3?url=${url}`
+const r = await axios.get(`https://api.popcat.xyz/ytmp3?url=${url}`)
 
 await sock.sendMessage(from,{
-audio:{url:api},
-mimetype:"audio/mp4"
+audio:{url:r.data.url},
+mimetype:"audio/mpeg"
 })
 
 }catch{
 
-sock.sendMessage(from,{text:"erro mp3"})
+await sock.sendMessage(from,{
+text:"❌ erro download"
+})
 
 }
+
+}
+
+if(command==="!ytmp4"){
+
+const url = args[1]
+
+if(!url) return
+
+try{
+
+const r = await axios.get(`https://api.popcat.xyz/ytmp4?url=${url}`)
+
+await sock.sendMessage(from,{
+video:{url:r.data.url}
+})
+
+}catch{
+
+await sock.sendMessage(from,{
+text:"❌ erro baixar vídeo"
+})
+
+}
+
 }
 
 if(command==="!tiktok"){
 
-let url=text.split(" ")[1]
+const url = args[1]
 
-if(!url) return sock.sendMessage(from,{text:"envie link tiktok"})
-
-try{
-
-let api=`https://api.douxx.tech/api/tiktok/video?url=${url}`
+if(!url) return
 
 await sock.sendMessage(from,{
-video:{url:api},
-caption:"📥 download tiktok"
+text:`📥 Baixe aqui:\nhttps://snaptik.app`
 })
 
-}catch{
+}
 
-sock.sendMessage(from,{text:"erro tiktok"})
+if(command==="!instagram"){
+
+const url = args[1]
+
+if(!url) return
+
+await sock.sendMessage(from,{
+text:`📥 Baixe aqui:\nhttps://snapinsta.app`
+})
 
 }
+
+if(command==="!sticker"){
+
+const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage
+
+if(!quoted?.imageMessage){
+
+return sock.sendMessage(from,{
+text:"📸 responda uma imagem com !sticker"
+})
+
+}
+
+const buffer = await sock.downloadMediaMessage({
+message:{imageMessage:quoted.imageMessage}
+})
+
+await sock.sendMessage(from,{
+sticker:buffer
+})
+
 }
 
 })
-
-}catch(err){
-
-console.log("erro iniciar",err)
-
-setTimeout(startBot,5000)
-
-}
 
 }
 
