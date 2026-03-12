@@ -66,7 +66,7 @@ async function startBot() {
 
       if (qr) {
         console.log("📱 ESCANEIE O QR:")
-        qrcode.generate(qr, { small: true })
+        console.log("QR CODE:", qr)
       }
 
       if (connection === "open") {
