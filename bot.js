@@ -1,53 +1,84 @@
+console.log("🚀 Iniciando GumballBot...")
+
 const {
 default: makeWASocket,
-useMultiFileAuthState
+useMultiFileAuthState,
+DisconnectReason,
+fetchLatestBaileysVersion
 } = require("@whiskeysockets/baileys")
 
-const pino = require("pino")
+const P = require("pino")
+const qrcode = require("qrcode-terminal")
+const { Boom } = require("@hapi/boom")
 const fs = require("fs")
+
+process.on("uncaughtException", console.error)
+process.on("unhandledRejection", console.error)
+
+const usuarios = new Set()
 
 async function startBot(){
 
-const { state, saveCreds } =
-await useMultiFileAuthState("./auth")
+const { state, saveCreds } = await useMultiFileAuthState("auth")
+const { version } = await fetchLatestBaileysVersion()
 
 const sock = makeWASocket({
-logger: pino({ level:"silent" }),
-auth: state
+version,
+logger: P({ level:"silent" }),
+auth: state,
+printQRInTerminal:false
 })
 
 sock.ev.on("creds.update", saveCreds)
 
-sock.ev.on("connection.update", async(update)=>{
+sock.ev.on("connection.update", async (update)=>{
 
-const { connection, qr } = update
+const { connection, qr, lastDisconnect } = update
 
-if(qr){
+if (qr) {
 
-console.log("ESCANEIE O QR CODE:")
-console.log(qr)
+console.clear()
 
-console.log("TEM 1 MINUTO")
+console.log("===================================")
+console.log("📱 ESCANEIE O QR CODE NO WHATSAPP")
+console.log("===================================\n")
 
-await new Promise(r=>setTimeout(r,60000))
+// QR CODE EM TEXTO (ASCII)
+qrcode.generate(qr, {
+small: false
+})
 
+console.log("\n⏳ Tempo para escanear: 1 MINUTO\n")
+
+await new Promise(resolve => setTimeout(resolve, 60000))
+
+  }
+
+if(connection==="open"){
+console.log("✅ GumballBot conectado!")
 }
 
-if(connection === "open"){
-console.log("BOT ONLINE")
-}
+if(connection==="close"){
 
-if(connection === "close"){
+const shouldReconnect =
+(lastDisconnect?.error instanceof Boom ?
+lastDisconnect.error.output.statusCode :
+0) !== DisconnectReason.loggedOut
+
+if(shouldReconnect){
+console.log("🔄 Reconectando...")
 startBot()
+}
+
 }
 
 })
 
-sock.ev.on("messages.upsert", async({messages})=>{
+sock.ev.on("messages.upsert", async ({messages})=>{
 
 const msg = messages[0]
-
 if(!msg.message) return
+if(msg.key.fromMe) return
 
 const from = msg.key.remoteJid
 
@@ -56,19 +87,57 @@ msg.message.conversation ||
 msg.message.extendedTextMessage?.text ||
 ""
 
-const command = text.split(" ")[0].toLowerCase()
+const args = text.split(" ")
+const command = args[0].toLowerCase()
 
-// carregar comandos
+console.log("📩",text)
 
-const comandos = fs.readdirSync("./comandos")
 
-for(const file of comandos){
+// mensagem inicial
+if(!usuarios.has(from)){
 
-const cmd = require(`./comandos/${file}`)
+usuarios.add(from)
+
+await sock.sendMessage(from,{
+text:`╔══════════════╗
+  𝙂𝙐𝙈𝘽𝘼𝙇𝙇 𝘽𝙊𝙏 😺
+╚══════════════╝
+
+"Às vezes a vida é maluca… mas sempre dá pra rir!"
+
+Digite:
+➜ !menu
+
+🤖 criado por _pauloofc`
+})
+
+}
+
+
+// CARREGAR COMANDOS
+const pastas = [
+"./comandos",
+"./comandos/util",
+"./comandos/download",
+"./comandos/diversao",
+"./comandos/figurinhas"
+]
+
+for(const pasta of pastas){
+
+if(!fs.existsSync(pasta)) continue
+
+const arquivos = fs.readdirSync(pasta)
+
+for(const file of arquivos){
+
+const cmd = require(`${pasta}/${file}`)
 
 if(cmd.name === command){
 
-cmd.execute(sock,msg,text)
+cmd.execute(sock, msg, args, text)
+
+}
 
 }
 
@@ -79,3 +148,7 @@ cmd.execute(sock,msg,text)
 }
 
 startBot()
+
+setInterval(()=>{
+console.log("💓 BOT ONLINE")
+},60000)
