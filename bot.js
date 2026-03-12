@@ -10,12 +10,12 @@ fetchLatestBaileysVersion
 const { Boom } = require("@hapi/boom")
 const P = require("pino")
 const axios = require("axios")
+const ytdl = require("ytdl-core")
 
 // proteção contra crash
 process.on("uncaughtException", console.error)
 process.on("unhandledRejection", console.error)
 
-// salvar usuários que já receberam mensagem inicial
 const usuariosIniciados = new Set()
 
 async function startBot(){
@@ -51,7 +51,7 @@ lastDisconnect.error.output.statusCode :
 0) !== DisconnectReason.loggedOut
 
 if(shouldReconnect){
-console.log("🔄 reconectando...")
+console.log("🔄 Reconectando...")
 startBot()
 }
 
@@ -74,12 +74,12 @@ msg.message.extendedTextMessage?.text ||
 ""
 
 const args = text.trim().split(/ +/)
-const command = args[0].toLowerCase()
+const command = args[0]?.toLowerCase()
 
-console.log("📩",text)
+console.log("📩", text)
 
 
-// mensagem inicial só uma vez
+// mensagem inicial 1 vez
 if(!usuariosIniciados.has(from)){
 
 usuariosIniciados.add(from)
@@ -89,7 +89,7 @@ text:`😺 Olá! Eu sou o *GumballBot*
 
 "A vida é meio maluca… mas sempre dá pra rir!"
 
-Digite *!menu* para ver meus comandos.
+Digite *!menu* para ver os comandos.
 
 🤖 criado por _pauloofc`
 })
@@ -104,7 +104,6 @@ await sock.sendMessage(from,{
 text:`🤖 *GUMBALL BOT*
 
 📥 DOWNLOAD
-!play nome
 !ytmp3 link
 !ytmp4 link
 
@@ -131,13 +130,11 @@ text:`🤖 *GUMBALL BOT*
 }
 
 
-// VOLTAR MENU
+// VOLTAR
 if(command==="!voltar"){
 
 await sock.sendMessage(from,{
-text:`🔙 Voltando ao menu
-
-Digite *!menu*`
+text:"🔙 Voltando ao menu\nDigite *!menu*"
 })
 
 }
@@ -181,16 +178,12 @@ try{
 const r = await axios.get("https://official-joke-api.appspot.com/random_joke")
 
 await sock.sendMessage(from,{
-text:`😂 ${r.data.setup}
-
-${r.data.punchline}`
+text:`😂 ${r.data.setup}\n\n${r.data.punchline}`
 })
 
 }catch{
 
-await sock.sendMessage(from,{
-text:"❌ erro buscar piada"
-})
+sock.sendMessage(from,{text:"❌ erro pegar piada"})
 
 }
 
@@ -214,9 +207,7 @@ ${r.data.localidade} - ${r.data.uf}`
 
 }catch{
 
-await sock.sendMessage(from,{
-text:"❌ erro buscar CEP"
-})
+sock.sendMessage(from,{text:"❌ erro buscar CEP"})
 
 }
 
@@ -239,35 +230,7 @@ text:`🌤 ${r.data}`
 
 }catch{
 
-await sock.sendMessage(from,{
-text:"❌ erro clima"
-})
-
-}
-
-}
-
-
-// PLAY MUSICA
-if(command==="!play"){
-
-const nome = args.slice(1).join(" ")
-if(!nome) return
-
-try{
-
-const r = await axios.get(`https://api.popcat.xyz/yt?q=${nome}`)
-
-await sock.sendMessage(from,{
-audio:{url:r.data.url},
-mimetype:"audio/mpeg"
-})
-
-}catch{
-
-await sock.sendMessage(from,{
-text:"❌ erro baixar música"
-})
+sock.sendMessage(from,{text:"❌ erro pegar clima"})
 
 }
 
@@ -278,22 +241,27 @@ text:"❌ erro baixar música"
 if(command==="!ytmp3"){
 
 const url = args[1]
-if(!url) return
+
+if(!url || !ytdl.validateURL(url)){
+return sock.sendMessage(from,{text:"❌ envie link válido do YouTube"})
+}
 
 try{
 
-const r = await axios.get(`https://api.popcat.xyz/ytmp3?url=${url}`)
+await sock.sendMessage(from,{text:"🎵 Baixando música..."})
+
+const stream = ytdl(url,{filter:"audioonly"})
 
 await sock.sendMessage(from,{
-audio:{url:r.data.url},
+audio: stream,
 mimetype:"audio/mpeg"
 })
 
-}catch{
+}catch(e){
 
-await sock.sendMessage(from,{
-text:"❌ erro download"
-})
+console.log(e)
+
+sock.sendMessage(from,{text:"❌ erro baixar música"})
 
 }
 
@@ -304,21 +272,26 @@ text:"❌ erro download"
 if(command==="!ytmp4"){
 
 const url = args[1]
-if(!url) return
+
+if(!url || !ytdl.validateURL(url)){
+return sock.sendMessage(from,{text:"❌ envie link válido do YouTube"})
+}
 
 try{
 
-const r = await axios.get(`https://api.popcat.xyz/ytmp4?url=${url}`)
+await sock.sendMessage(from,{text:"🎬 Baixando vídeo..."})
+
+const stream = ytdl(url,{quality:"18"})
 
 await sock.sendMessage(from,{
-video:{url:r.data.url}
+video: stream
 })
 
-}catch{
+}catch(e){
 
-await sock.sendMessage(from,{
-text:"❌ erro baixar vídeo"
-})
+console.log(e)
+
+sock.sendMessage(from,{text:"❌ erro baixar vídeo"})
 
 }
 
@@ -328,7 +301,7 @@ text:"❌ erro baixar vídeo"
 // STICKER
 if(command==="!sticker"){
 
-const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage
+const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage
 
 if(!quoted?.imageMessage){
 
@@ -338,13 +311,21 @@ text:"📸 responda uma imagem com !sticker"
 
 }
 
-const buffer = await sock.downloadMediaMessage({
-message:{imageMessage:quoted.imageMessage}
-})
+try{
+
+const buffer = await sock.downloadMediaMessage(msg)
 
 await sock.sendMessage(from,{
-sticker:buffer
+sticker: buffer
 })
+
+}catch(e){
+
+console.log(e)
+
+sock.sendMessage(from,{text:"❌ erro criar figurinha"})
+
+}
 
 }
 
