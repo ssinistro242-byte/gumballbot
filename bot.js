@@ -1,169 +1,395 @@
-console.log("🚀 BOT INICIANDO...")
+console.log("🚀 GUMBALL BOT INICIANDO...")
 
 const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion
+default: makeWASocket,
+useMultiFileAuthState,
+DisconnectReason,
+fetchLatestBaileysVersion
 } = require("@whiskeysockets/baileys")
 
 const { Boom } = require("@hapi/boom")
 const P = require("pino")
-const qrcode = require("qrcode-terminal")
-const WebSocket = require("ws")
+const fetch = require("node-fetch")
 const https = require("https")
+const WebSocket = require("ws")
 
-// proteção contra crash
-process.on("uncaughtException", (err) => {
-  console.error("❌ Erro não tratado:", err)
-})
-
-process.on("unhandledRejection", (reason) => {
-  console.error("❌ Promise rejeitada:", reason)
-})
+process.on("uncaughtException",err=>console.log(err))
+process.on("unhandledRejection",err=>console.log(err))
 
 let reconnectDelay = 2000
 
-async function startBot() {
+async function startBot(){
 
-  try {
+try{
 
-    const { state, saveCreds } = await useMultiFileAuthState("auth")
+const {state,saveCreds} = await useMultiFileAuthState("auth")
 
-    const { version } = await fetchLatestBaileysVersion()
+const {version} = await fetchLatestBaileysVersion()
 
-    const sock = makeWASocket({
+const sock = makeWASocket({
 
-      auth: state,
-      version,
+auth: state,
+version,
 
-      logger: P({ level: "silent" }),
+logger: P({level:"silent"}),
 
-      browser: ["Ubuntu", "Chrome", "120.0.0"],
+browser:["Ubuntu","Chrome","120.0.0"],
 
-      connectTimeoutMs: 60000,
+connectTimeoutMs:60000,
 
-      keepAliveIntervalMs: 20000,
+keepAliveIntervalMs:20000,
 
-      markOnlineOnConnect: true,
+markOnlineOnConnect:true,
 
-      syncFullHistory: false,
+syncFullHistory:false,
 
-      printQRInTerminal: false,
+printQRInTerminal:false,
 
-      agent: new https.Agent({
-        keepAlive: true,
-        maxSockets: 1
-      }),
+agent:new https.Agent({
+keepAlive:true,
+maxSockets:1
+}),
 
-      ws: WebSocket
+ws:WebSocket
 
-    })
+})
 
-    sock.ev.on("creds.update", saveCreds)
+sock.ev.on("creds.update",saveCreds)
 
-    sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+sock.ev.on("connection.update",({connection,lastDisconnect,qr})=>{
 
-      if (qr) {
-        console.log("📱 ESCANEIE O QR:")
-        console.log("QR CODE:", qr)
-      }
+if(qr){
+console.log("📱 ESCANEIE O QR:")
+console.log("QR CODE:",qr)
+}
 
-      if (connection === "open") {
+if(connection==="open"){
+console.log("✅ BOT CONECTADO")
+reconnectDelay=2000
+}
 
-        console.log("✅ BOT CONECTADO")
+if(connection==="close"){
 
-        reconnectDelay = 2000
+const error=lastDisconnect?.error
+const code=error?new Boom(error).output.statusCode:0
 
-      }
+if(code===DisconnectReason.loggedOut){
+console.log("❌ sessão encerrada apague pasta auth")
+return
+}
 
-      if (connection === "close") {
+console.log("🔄 reconectando...")
 
-        const error = lastDisconnect?.error
-        const code = error ? new Boom(error).output.statusCode : 0
+setTimeout(startBot,reconnectDelay)
 
-        console.log(`⚠️ Conexão fechada (code=${code})`)
+reconnectDelay=Math.min(reconnectDelay*2,30000)
 
-        if (code === DisconnectReason.loggedOut) {
+}
 
-          console.log("❌ Sessão encerrada. Apague a pasta 'auth' e reconecte.")
+})
 
-          return
+sock.ev.on("messages.upsert",async({messages})=>{
 
-        }
+const msg=messages?.[0]
+if(!msg) return
+if(!msg.message) return
 
-        console.log(`🔄 Reconectando em ${reconnectDelay / 1000}s...`)
+const from=msg.key.remoteJid
 
-        setTimeout(startBot, reconnectDelay)
+const text=
+msg.message.conversation||
+msg.message.extendedTextMessage?.text||
+""
 
-        reconnectDelay = Math.min(reconnectDelay * 2, 30000)
+if(!text) return
 
-      }
+const command=text.split(" ")[0]
 
-    })
+console.log("📩",text)
 
-    sock.ev.on("messages.upsert", async ({ messages }) => {
+if(text==="oi"||text==="ola"){
+await sock.sendMessage(from,{
+text:`😺 Olá!
 
-      const msg = messages?.[0]
+Eu sou o *GumballBot*
 
-      if (!msg) return
-      if (!msg.message) return
+"A vida pode ser estranha… mas sempre pode ficar divertida."
 
-      const from = msg.key.remoteJid
+Digite *!menu*
 
-      const text =
-        msg.message.conversation ||
-        msg.message.extendedTextMessage?.text ||
-        ""
+🤖 Bot criado por _pauloofc`
+})
+}
 
-      console.log("📩 Mensagem:", text)
+if(command==="!menu"){
+await sock.sendMessage(from,{
+text:`😺 *GUMBALL BOT*
 
-      if (text === "!ping") {
-
-        await sock.sendMessage(from, {
-          text: "🏓 pong"
-        })
-
-      }
-
-      if (text === "!menu") {
-
-        await sock.sendMessage(from, {
-
-          text:
-`🤖 GumballBot Online
-
-Comandos:
-
-!menu
+⚙️ Sistema
 !ping
-`
+!hora
+!data
+!criador
+!id
 
-        })
+🌎 Utilidades
+!clima cidade
+!cep numero
+!dolar
+!traduz texto
 
-      }
+🎲 Diversão
+!dado
+!moeda
+!chance
+!numero
+!piada
+!fato
+!conselho
 
-    })
+🎮 Jogos
+!math
+!quiz
+!adivinhar
 
-  }
+📥 Downloads
+!yt link
+!ytmp3 link
+!tiktok link
 
-  catch (err) {
+🤖 Criado por _pauloofc`
+})
+}
 
-    console.error("❌ Erro ao iniciar:", err)
+if(command==="!ping"){
+await sock.sendMessage(from,{text:"🏓 pong"})
+}
 
-    console.log("🔁 Reiniciando em 5 segundos...")
+if(command==="!hora"){
+await sock.sendMessage(from,{text:`⏰ ${new Date().toLocaleTimeString()}`})
+}
 
-    setTimeout(startBot, 5000)
+if(command==="!data"){
+await sock.sendMessage(from,{text:`📅 ${new Date().toLocaleDateString()}`})
+}
 
-  }
+if(command==="!criador"){
+await sock.sendMessage(from,{text:"🤖 bot criado por _pauloofc"})
+}
+
+if(command==="!id"){
+await sock.sendMessage(from,{text:`🆔 ${from}`})
+}
+
+if(command==="!dado"){
+let n=Math.floor(Math.random()*6)+1
+await sock.sendMessage(from,{text:`🎲 ${n}`})
+}
+
+if(command==="!moeda"){
+let r=Math.random()<0.5?"cara":"coroa"
+await sock.sendMessage(from,{text:`🪙 ${r}`})
+}
+
+if(command==="!chance"){
+let n=Math.floor(Math.random()*100)
+await sock.sendMessage(from,{text:`🎯 ${n}%`})
+}
+
+if(command==="!numero"){
+let n=Math.floor(Math.random()*100)
+await sock.sendMessage(from,{text:`🔢 ${n}`})
+}
+
+if(command==="!piada"){
+try{
+let res=await fetch("https://official-joke-api.appspot.com/random_joke")
+let data=await res.json()
+await sock.sendMessage(from,{text:`😂 ${data.setup}\n\n${data.punchline}`})
+}catch{
+sock.sendMessage(from,{text:"erro piada"})
+}
+}
+
+if(command==="!conselho"){
+try{
+let res=await fetch("https://api.adviceslip.com/advice")
+let data=await res.json()
+await sock.sendMessage(from,{text:`💡 ${data.slip.advice}`})
+}catch{
+sock.sendMessage(from,{text:"erro conselho"})
+}
+}
+
+if(command==="!fato"){
+try{
+let res=await fetch("https://uselessfacts.jsph.pl/random.json?language=en")
+let data=await res.json()
+await sock.sendMessage(from,{text:`📚 ${data.text}`})
+}catch{
+sock.sendMessage(from,{text:"erro fato"})
+}
+}
+
+if(command==="!clima"){
+
+let cidade=text.split(" ").slice(1).join(" ")
+
+if(!cidade){
+return sock.sendMessage(from,{text:"use !clima cidade"})
+}
+
+try{
+
+let res=await fetch(`https://wttr.in/${cidade}?format=j1`)
+let data=await res.json()
+
+let temp=data.current_condition[0].temp_C
+let desc=data.current_condition[0].weatherDesc[0].value
+let hum=data.current_condition[0].humidity
+
+await sock.sendMessage(from,{
+text:`🌤️ Clima em ${cidade}
+
+🌡️ Temperatura: ${temp}°C
+☁️ Condição: ${desc}
+💧 Umidade: ${hum}%`
+})
+
+}catch{
+
+sock.sendMessage(from,{text:"erro clima"})
+
+}
+}
+
+if(command==="!cep"){
+
+let cep=text.split(" ")[1]
+
+try{
+
+let res=await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+let data=await res.json()
+
+await sock.sendMessage(from,{
+text:`📍 CEP ${cep}
+
+Rua: ${data.logradouro}
+Bairro: ${data.bairro}
+Cidade: ${data.localidade}
+Estado: ${data.uf}`
+})
+
+}catch{
+
+sock.sendMessage(from,{text:"erro cep"})
+
+}
+}
+
+if(command==="!dolar"){
+try{
+let res=await fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL")
+let data=await res.json()
+await sock.sendMessage(from,{text:`💰 dólar: R$ ${data.USDBRL.bid}`})
+}catch{
+sock.sendMessage(from,{text:"erro dolar"})
+}
+}
+
+if(command==="!traduz"){
+
+let texto=text.split(" ").slice(1).join(" ")
+
+try{
+
+let res=await fetch(`https://api.mymemory.translated.net/get?q=${texto}&langpair=en|pt`)
+let data=await res.json()
+
+await sock.sendMessage(from,{text:`🌎 ${data.responseData.translatedText}`})
+
+}catch{
+
+sock.sendMessage(from,{text:"erro tradução"})
+
+}
+}
+
+if(command==="!yt"){
+
+let url=text.split(" ")[1]
+
+try{
+
+let res=await fetch(`https://api.tiklydown.eu.org/api/download/youtube?url=${url}`)
+let data=await res.json()
+
+await sock.sendMessage(from,{
+video:{url:data.video},
+caption:"📥 youtube download"
+})
+
+}catch{
+sock.sendMessage(from,{text:"erro download"})
+}
+
+}
+
+if(command==="!ytmp3"){
+
+let url=text.split(" ")[1]
+
+try{
+
+let res=await fetch(`https://api.tiklydown.eu.org/api/download/youtube?url=${url}`)
+let data=await res.json()
+
+await sock.sendMessage(from,{
+audio:{url:data.audio},
+mimetype:"audio/mp4"
+})
+
+}catch{
+sock.sendMessage(from,{text:"erro mp3"})
+}
+
+}
+
+if(command==="!tiktok"){
+
+let url=text.split(" ")[1]
+
+try{
+
+let res=await fetch(`https://api.tiklydown.eu.org/api/download/tiktok?url=${url}`)
+let data=await res.json()
+
+await sock.sendMessage(from,{
+video:{url:data.video},
+caption:"📥 tiktok download"
+})
+
+}catch{
+sock.sendMessage(from,{text:"erro tiktok"})
+}
+
+}
+
+})
+
+}catch(err){
+
+console.log("erro iniciar",err)
+
+setTimeout(startBot,5000)
+
+}
 
 }
 
 startBot()
 
-// heartbeat para manter o bot ativo
-setInterval(() => {
-
-  console.log("💓 BOT ONLINE", new Date().toLocaleTimeString())
-
-}, 60000)
+setInterval(()=>{
+console.log("💓 BOT ONLINE")
+},60000)
