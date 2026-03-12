@@ -1,21 +1,21 @@
 {
   "name": "gumballbot",
-  "version": "4.0.0",
-  "description": "GumballBot Ultra",
+  "version": "1.0.0",
+  "description": "Gumball WhatsApp Bot",
   "main": "bot.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node bot.js"
   },
   "author": "pauloofc",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc.9",
-    "@hapi/boom": "^10.0.1",
-    "axios": "^1.6.7",
+    "@whiskeysockets/baileys": "^6.7.2",
+    "axios": "^1.6.8",
     "pino": "^8.21.0",
     "qrcode-terminal": "^0.12.0",
-    "sharp": "^0.33.0".
-    "ws": "^8.17.0"
-    "ytdl-core": "4.11.5"
+    "yt-search": "^2.12.1",
+    "ytdl-core": "^4.11.5",
+    "fs-extra": "^11.2.0"
   }
 }
